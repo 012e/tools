@@ -1,6 +1,5 @@
 import re
 import string
-import logging as l
 
 # Value to char
 ANS_CHAR = dict(zip(range(1, 27), string.ascii_uppercase)) 
@@ -21,8 +20,6 @@ ALL_CORRECT_ANS_REGEX = re.compile(r'''
 ([1234]+)
 ,"point":"1",
 ''', re.X)
-
-l.basicConfig(filename="answer.log",level=l.DEBUG)
 
 # Input params 
 print("Input total question:")
