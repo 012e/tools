@@ -5,7 +5,7 @@ import string
 ANS_CHAR = dict(zip(range(1, 27), string.ascii_uppercase)) 
 
 # Open file
-FILE = open("/home/huy/Projects/k12/extracted.html", "r")
+FILE = open("/home/huy/Projects/k12/input.txt", "r")
 TEXT = FILE.read()
 
 
@@ -28,23 +28,18 @@ print("Input number of answers per question:")
 ans_per_question = int(input())
 
 # Vars initialization
-all_ans = re.findall(ALL_ANS_REGEX, TEXT)
-all_correct_ans = re.findall(ALL_CORRECT_ANS_REGEX, TEXT)
-ans_val = [None] * ans_per_question
+ANS = re.findall(ALL_ANS_REGEX, TEXT)
+CORRECT_ANS = re.findall(ALL_CORRECT_ANS_REGEX, TEXT)
 
 # Logics
 for i in range(0, total_question *  ans_per_question, ans_per_question):
     current_question_index = int(i / ans_per_question)
-    current_correct_ans = int(all_correct_ans[current_question_index])
+    current_correct_ans = int(CORRECT_ANS[current_question_index])
 
     for j in range(0, ans_per_question):
         current_ans_index = i + j
-        ans_val[j] = int(all_ans[current_ans_index])
-
-    for j in range(0, ans_per_question):
-        current_ans = ans_val[j]
+        current_ans = int(ANS[current_ans_index])
         if current_ans == current_correct_ans:
             print(f'{current_question_index + 1}: {ANS_CHAR[j + 1]}')
-            break
 
 FILE.close()
