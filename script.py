@@ -41,5 +41,6 @@ for i in range(0, total_question *  ans_per_question, ans_per_question):
         current_ans = int(ANS[current_ans_index])
         if current_ans == current_correct_ans:
             print(f'{current_question_index + 1}: {ANS_CHAR[j + 1]}')
+            break
 
 FILE.close()
