@@ -2,10 +2,10 @@ import re
 import string
 import logging as l
 
-# alphabet to number
+# Value to char
 ANS_CHAR = dict(zip(range(1, 27), string.ascii_uppercase)) 
 
-# open file
+# Open file
 FILE = open("/home/huy/Projects/k12/extracted.html", "r")
 TEXT = FILE.read()
 
