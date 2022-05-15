@@ -1,11 +1,20 @@
 import re
+import os
 import string
 
-# Value to char
-ANS_CHAR = dict(zip(range(1, 27), string.ascii_uppercase)) 
+"""
+Value to char:
+ANS_CHAR = {
+    1: 'A',
+    2: 'B',
+    3: 'C',
+    ...
+}
+"""
+ANS_CHAR = dict(zip(range(1, 27), string.ascii_uppercase))
 
-# Open file
-FILE = open("/home/huy/Projects/k12/bruh.txt", "r")
+# Open file (<current dir>/bruh.txt)
+FILE = open(os.getcwd() + "/bruh.txt", "r")
 TEXT = FILE.read()
 
 ALL_ANS_REGEX = re.compile(r'''
@@ -20,7 +29,7 @@ ALL_CORRECT_ANS_REGEX = re.compile(r'''
 ,"point":"1",
 ''', re.X)
 
-# Input params 
+# Input params
 print("Input total question:")
 total_question = int(input())
 print("Input number of answers per question:")
@@ -37,12 +46,12 @@ ans = re.findall(ALL_ANS_REGEX, TEXT)
 # remove all non-number characters
 ans = [int(re.sub("[^0-9]", "", s)) for s in ans]
 # split into smaller chunks by question
-ans = [ans[i:i + ans_per_question] for i in range(0, len(ans), ans_per_question)]
+ans = [ans[i:i + ans_per_question]
+       for i in range(0, len(ans), ans_per_question)]
 
-# correct ans is taken from text
 # form: "answerCode": <this-code>, "point": "1"
 correct_ans = re.findall(ALL_CORRECT_ANS_REGEX, TEXT)
-# remove all non-number characters
+# remove non-number chars + convert to number
 correct_ans = [int(re.sub("[^0-9]", "", s)) for s in correct_ans]
 
 for i in range(0, total_question):
