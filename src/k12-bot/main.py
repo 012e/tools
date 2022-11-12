@@ -47,6 +47,10 @@ def text_input(name, input):
     driver.find_element("xpath", f"//input[@placeholder='{name}']").send_keys(input)
 
 
+def click_contains(type: str, text: str):
+    driver.find_element(By.XPATH, f"//{type}[contains(text(), '{text}')]").click()
+
+
 def login_button_click():
     button_class = "btn btn-primary btn-login"
     driver.find_element("xpath", f"//button[@class='{button_class}']").click()
@@ -60,6 +64,56 @@ def chunks(lst, n):
     """Yield successive n-sized chunks from lst."""
     for i in range(0, len(lst), n):
         yield lst[i : i + n]
+
+
+def normal_test():
+    click_contains("span", "Bài kiểm tra")
+    all_tests = driver.find_elements(
+        By.XPATH, "//div[@class='test-item mb-10 happening  exam-sucess']"
+    )
+
+    if len(all_tests) == 0:
+        log.info("no active test, exiting")
+        quit()
+
+    # if there is tests then list them all and the let the user select
+    log.info("selecting exam")
+    for i, test in enumerate(all_tests):
+        text_name = test.find_element(By.TAG_NAME, "b").get_attribute("innerText")
+        print(f"{i+1}. {text_name}")
+
+    selected_test = int(input("Input the desired test to be done: ")) - 1
+    all_tests[selected_test].find_element(By.TAG_NAME, "a").click()
+
+
+def special_test(type: str):
+    click_contains("span", "Kỳ thi")
+    time.sleep(1)
+    match type:
+        case "department":
+            type = "Cấp Sở/Phòng"
+        case "school":
+            type = "Cấp trường"
+
+    click_contains("a", type)
+    all_tests = driver.find_elements(By.XPATH, "//button[@id='accordion-button-1']")
+
+    if len(all_tests) == 0:
+        log.info("no active test, exiting")
+        quit()
+
+    # if there is tests then list them all and the let the user select
+    log.info("selecting exam")
+    for i, test in enumerate(all_tests):
+        test_name = test.find_element(By.CLASS_NAME, "title-exam").get_attribute(
+            "innerText"
+        )
+        print(f"{i+1}. {test_name}")
+
+    selected_test = int(input("Input the desired test to be done: ")) - 1
+    all_tests[selected_test].click()
+    time.sleep(1)
+    driver.find_element(By.XPATH, "//a[@class='btn btn-exam']").click()
 
 
 log.info("parsing config file")
@@ -76,31 +130,21 @@ log.info("getting into the exam page")
 time.sleep(0.5)
 driver.find_element("xpath", f"//span[contains(text(), 'Kiểm tra, đánh giá')]").click()
 time.sleep(0.5)
-driver.find_element("xpath", f"//span[contains(text(), 'Bài kiểm tra')]").click()
+
+print(user["test_type"])
+if user["test_type"] == "normal":
+    normal_test()
+else:
+    special_test(user["test_type"])
+
 time.sleep(1)
 
-# find total exams
-all_tests = driver.find_elements(
-    "xpath", "//div[@class='test-item mb-10 happening  exam-sucess']"
-)
 
-if len(all_tests) == 0:
-    log.info("no active test, exiting")
-    quit()
-
-# if there is tests then list them all and the let the user select
-log.info("selecting exam")
-for i, test in enumerate(all_tests):
-    text_name = test.find_element(By.TAG_NAME, "b").get_attribute("innerText")
-    print(f"{i+1}. {text_name}")
-
-selected_test = int(input("Input the desired test to be done: ")) - 1
-all_tests[selected_test].find_element(By.TAG_NAME, "a").click()
 # becaues it's on mobile simulation, a confirmation button is shown
 time.sleep(0.5)
-driver.find_element(By.XPATH, "//button[contains(text(), 'Tiếp tục')]").click()
+click_contains("button", "Tiếp tục")
 time.sleep(0.5)
-driver.find_element(By.XPATH, "//button[contains(text(), 'Đồng ý')]").click()
+click_contains("button", "Đồng ý")
 time.sleep(3)
 log.info("enter exam")
 
@@ -110,8 +154,8 @@ log.info("attemping the exploit")
 driver.refresh()
 time.sleep(3)
 
-# request that contains the answer
-course_site_id = driver.current_url.partition("courseSiteId=")[2]
+# course_site_id = driver.current_url.partition("courseSiteId=")[2]
+course_site_id = "2004605"
 # request that contains the answer
 good_req_url = f"https://agg-thptnguyentrungtruc.k12online.vn/?module=Content.Form&moduleId=1&cmd=redraw&site={course_site_id}&url_mode=rewrite&submitFormId=1&moduleId=1&page=Courseware.Exam.doExam&site={course_site_id}"
 
@@ -133,8 +177,11 @@ file = open("response-decoded.txt", "w+")
 file.write(res_text)
 file.close()
 
+total_question = len(
+    driver.find_element(By.CLASS_NAME, "checkExaming").find_elements(By.TAG_NAME, "a")
+)
 log.info("getting correct answers")
-correct_answers = parse(res_text, 25, 4)
+correct_answers = parse(res_text, total_question, 4)
 all_answers = driver.find_elements(By.XPATH, "//div[@class='radio  ']")
 all_answers = chunks(all_answers, 4)
 
@@ -142,7 +189,7 @@ log.info("ticking all the question")
 for i, question in enumerate(all_answers):
     # click on correct answer
     question[correct_answers[i]].find_element(By.TAG_NAME, "input").click()
-    time.sleep(0.5)
+    time.sleep(0.4)
 
 log.info("finished")
 
