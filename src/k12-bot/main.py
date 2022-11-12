@@ -125,32 +125,33 @@ text_input("Tên tài khoản", user["name"])
 text_input("Mật khẩu", user["password"])
 login_button_click()
 
-# getting into the exam page
-log.info("getting into the exam page")
-time.sleep(0.5)
-driver.find_element("xpath", f"//span[contains(text(), 'Kiểm tra, đánh giá')]").click()
-time.sleep(0.5)
-
-print(user["test_type"])
-if user["test_type"] == "normal":
-    normal_test()
+if user["manual"] == True:
+    input("Entering manual mode, press Enter to exit")
 else:
-    special_test(user["test_type"])
+    # getting into the exam page
+    log.info("getting into the exam page")
+    time.sleep(0.5)
+    click_contains("span", "Kiểm tra, đánh giá")
+    time.sleep(0.5)
 
-time.sleep(1)
-
-
-# becaues it's on mobile simulation, a confirmation button is shown
-time.sleep(0.5)
-click_contains("button", "Tiếp tục")
-time.sleep(0.5)
-click_contains("button", "Đồng ý")
-time.sleep(3)
+    print(user["test_type"])
+    if user["test_type"] == "normal":
+        normal_test()
+    else:
+        special_test(user["test_type"])
+    time.sleep(1)
+    # becaues it's on mobile simulation, a confirmation button is shown
+    time.sleep(0.5)
+    click_contains("button", "Tiếp tục")
+    time.sleep(0.5)
+    click_contains("button", "Đồng ý")
+    time.sleep(3)
 log.info("enter exam")
 
 
 # refresh for the result exploit
 log.info("attemping the exploit")
+time.sleep(1)
 driver.refresh()
 time.sleep(3)
 
@@ -189,7 +190,7 @@ log.info("ticking all the question")
 for i, question in enumerate(all_answers):
     # click on correct answer
     question[correct_answers[i]].find_element(By.TAG_NAME, "input").click()
-    time.sleep(0.4)
+    time.sleep(1)
 
 log.info("finished")
 
