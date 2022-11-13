@@ -62,22 +62,15 @@ def get_relative_ans(total_question: int, ans_per_question: int) -> list[int]:
 def parse(text: str, total_question, ans_per_question) -> list[int]:
     ans = get_all_ans(text, total_question, ans_per_question)
     correct_ans = get_corrent_ans(text)
-    print(len(ans))
     res = []
     for i in range(0, total_question):
         res.append(ans[i].index(correct_ans[i]))
     return res
 
 
-# Input params
-# print("Input total question:")
-# total_question = int(input())
-# print("Input number of answers per question:")
-# ans_per_question = int(input())
-
 if __name__ == "__main__":
 
-    total_question = 25
+    total_question = int(input("how much questions are there: "))
     ans_per_question = 4
 
     # Open file (<current dir>/bruh.txt)
