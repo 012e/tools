@@ -66,6 +66,13 @@ def chunks(lst, n):
         yield lst[i : i + n]
 
 
+def file_content(path: str) -> str:
+    file = open(path, "r")
+    content = file.read()
+    file.close()
+    return content
+
+
 def normal_test():
     click_contains("span", "Bài kiểm tra")
     all_tests = driver.find_elements(
@@ -188,9 +195,12 @@ all_answers = chunks(all_answers, 4)
 
 log.info("ticking all the question")
 for i, question in enumerate(all_answers):
+    while file_content("state") == "0\n":
+        time.sleep(1)
+    print(i)
     # click on correct answer
     question[correct_answers[i]].find_element(By.TAG_NAME, "input").click()
-    time.sleep(1)
+    time.sleep(0.5)
 
 log.info("finished")
 
