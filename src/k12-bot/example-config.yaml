@@ -1,0 +1,16 @@
+name: your user name
+password: your password
+
+# test types:
+# normal: normal (daily) tests
+# school: school level tests
+# department: deparment level tests
+test_type: normal
+
+# manual mode:
+# instead of select the test, it just let you pick it yourself, and press Enter
+# to proceed to the exploit
+manual: no
+
+# max attemp of trying to apply the exploit (if it doesn't work)
+max_attemp: 5
