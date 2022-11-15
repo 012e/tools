@@ -132,6 +132,7 @@ text_input("Tên tài khoản", user["name"])
 text_input("Mật khẩu", user["password"])
 login_button_click()
 
+
 if user["manual"] == True:
     input("Entering manual mode, press Enter to exit")
 else:
@@ -190,17 +191,21 @@ total_question = len(
 )
 log.info("getting correct answers")
 correct_answers = parse(res_text, total_question, 4)
-all_answers = driver.find_elements(By.XPATH, "//div[@class='radio  ']")
-all_answers = chunks(all_answers, 4)
+print("finding all questions")
+all_questions = driver.find_elements("xpath", "//div[@class='choice-info-val']")
+print(len(all_questions))
 
 log.info("ticking all the question")
-for i, question in enumerate(all_answers):
+for i, question in enumerate(all_questions):
     while file_content("state") == "0\n":
         time.sleep(1)
-    print(i)
-    # click on correct answer
-    question[correct_answers[i]].find_element(By.TAG_NAME, "input").click()
+    print(f"checked {i}")
+    log.info(f"checked on {i}")
+    answers = question.find_elements(By.TAG_NAME, "div")
+    print(len(answers))
+    answers[correct_answers[i]].find_element(By.TAG_NAME, "input").click()
     time.sleep(0.5)
+
 
 log.info("finished")
 
