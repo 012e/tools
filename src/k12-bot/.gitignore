@@ -3,4 +3,5 @@ __pycache__/
 screenshots/
 *.log
 state
+config.yaml
 
