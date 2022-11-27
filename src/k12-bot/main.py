@@ -117,26 +117,25 @@ class K12Bot:
         time.sleep(1000000)
 
 
-log.info("parsing cli arguments")
-parser = argparse.ArgumentParser()
-parser.add_argument("--username", type=str, help="custom username")
-parser.add_argument("--password", type=str, help="custom password")
-parser.add_argument("--delay", type=float, help="delay time")
-parser.add_argument("--manual", type=bool, help="toggle manual mode")
-args = parser.parse_args()
+def parse_config_cli(yaml_keys: list[str]):
+    pass
 
+
+log.info("parsing cli arguments")
 log.info("parse config file")
 with open("config.yaml", "r") as stream:
     config = yaml.safe_load(stream)
 
-if args.username is not None:
-    config["username"] = args.username
-if args.password is not None:
-    config["password"] = args.password
-if args.delay is not None:
-    config["delay"] = args.delay
-if args.manual is not None:
-    config["manual"] = args.manual
+arguments: list[str] = list(config.keys())
+parser = argparse.ArgumentParser()
+for argument in arguments:
+    parser.add_argument(f"--{argument}", type=type(config[argument]))
+
+args = parser.parse_args()
+for argument in arguments:
+    current_cli_argument = getattr(args, argument)
+    if current_cli_argument is not None:
+        config[argument] = current_cli_argument
 
 
 if __name__ == "__main__":
