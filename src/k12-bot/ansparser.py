@@ -1,6 +1,7 @@
-import re
 import os
 import string
+import json
+
 
 """
 Value to char:
@@ -13,74 +14,64 @@ ANS_CHAR = {
 """
 ANS_CHAR = dict(zip(range(1, 27), string.ascii_uppercase))
 
-ALL_ANS_REGEX = re.compile(
-    r"""
-value="
-([1234.]+)
-"
-""",
-    re.X,
-)
+
+class QuestionSuite:
+    correct_choice: int
+    relative_correct_choice: int
+    total_choice: int
+    choice_arrangement: list[int]
+
+    def __init__(self, correct_choice: int, choice_arrangement: list[int]):
+        self.correct_choice = correct_choice
+        self.choice_arrangement = choice_arrangement
+        self.total_choice = len(choice_arrangement)
+        self.relative_correct_choice = choice_arrangement.index(correct_choice)
 
 
-def get_corrent_ans(text: str) -> list[int]:
-    ALL_CORRECT_ANS_REGEX = re.compile(
-        r'''{"answerCode":"?([\w\d.]+)"?[^}]*?"point":"1"''',
-        re.X,
-    )
+def findnth(haystack, needle, n):
+    parts = haystack.split(needle, n + 1)
+    if len(parts) <= n + 1:
+        return -1
+    return len(haystack) - len(parts[-1]) - len(needle)
 
-    # Exact only part with VHV.load at the beginning
-    # otherwise it won't work (will get some random extrated answers)
-    temp = ""
+
+def parse(text: str) -> list[QuestionSuite]:
+    ques_and_ans = []
     for line in text.splitlines():
         if line.startswith("VHV.load("):
-            temp += line
-    text = temp
+            ques_and_ans.append(line)
 
-    # form: "answerCode": <this-code>, "point": "1"
-    correct_ans = re.findall(ALL_CORRECT_ANS_REGEX, text)
-    # remove non-number chars + convert to number
-    correct_ans = [int(re.sub("[^0-9]", "", s)) for s in correct_ans]
-    return correct_ans
+    question_suites = []
+    for obj in ques_and_ans:
+        obj = obj[findnth(obj, "{", 1) :]
+        obj = obj[: obj.rfind("}")]
+        obj = obj[: obj.rfind("}") + 1]
+        obj = json.loads(obj)
+        for choice in obj["choices"]:
+            if choice["point"] == "1":
+                correct_choice = int(choice["answerCode"]) - 1
+                break
 
-
-def get_all_ans(text: str, total_question: int, ans_per_question) -> list[list[int]]:
-    # form: type="<this-code>"
-    ans = re.findall(ALL_ANS_REGEX, text)
-    # remove all non-number characters
-    ans = [int(re.sub("[^0-9]", "", s)) for s in ans]
-    # split into smaller chunks by question
-    ans = [ans[i : i + ans_per_question] for i in range(0, len(ans), ans_per_question)]
-    return ans
-
-
-def get_relative_ans(total_question: int, ans_per_question: int) -> list[int]:
-    for i in range(0, total_question):
-        curr_ans = ans[i].index(correct_ans[i])
-
-
-def parse(text: str, total_question, ans_per_question) -> list[int]:
-    ans = get_all_ans(text, total_question, ans_per_question)
-    correct_ans = get_corrent_ans(text)
-    res = []
-    for i in range(0, total_question):
-        res.append(ans[i].index(correct_ans[i]))
-    return res
+        question_suites.append(
+            QuestionSuite(
+                correct_choice=correct_choice,
+                choice_arrangement=[int(val) for val in obj["pos"]],
+            )
+        )
+    return question_suites
 
 
 if __name__ == "__main__":
 
-    total_question = int(input("how much questions are there: "))
-    ans_per_question = 4
-
     # Open file (<current dir>/bruh.txt)
-    FILE = open(os.getcwd() + "/bruh.txt", "r")
+    FILE = open(os.getcwd() + "/response-decoded.txt", "r")
     TEXT = FILE.read()
+    question_suites = parse(TEXT)
+    for i, question_suite in enumerate(question_suites):
+        correct_choice = question_suite.correct_choice
+        relative_correct_choice = question_suite.choice_arrangement.index(
+            correct_choice
+        )
+        print(f"{i+1}. {ANS_CHAR[relative_correct_choice+1]}")
 
-    ans = get_all_ans(TEXT, total_question, ans_per_question)
-    correct_ans = get_corrent_ans(TEXT)
-
-    for i in range(0, total_question):
-        curr_ans = ANS_CHAR[ans[i].index(correct_ans[i]) + 1]
-        print(f"{i + 1}. {curr_ans}")
     FILE.close()

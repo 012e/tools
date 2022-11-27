@@ -1,212 +1,157 @@
-from seleniumwire import webdriver
-from selenium.webdriver.common.action_chains import ActionChains
-from selenium.webdriver.chrome.service import Service as ChromeService
-from urllib3 import response
-from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.common.by import By
 
+import argparse
 import logging as log
-import sys
 import time
 import yaml
-import gzip
-from ansparser import parse
+import sys
+from ansparser import parse, QuestionSuite
+from botconfig import BotConfig
+from botdriver import BotDriver
+from utils import decode_gzip_bytes, read_file
 
 log.basicConfig(filename="logs.log", level=log.INFO)
+# log.basicConfig(stream=sys.stdout, level=log.INFO)
+
+
+class K12Bot:
+    def __init__(self, config: BotConfig):
+        self.config = config
+        self.bot = BotDriver(config["browser"])
+        self.bot.driver.get("https://agg-thptnguyentrungtruc.k12online.vn")
+
+        # shortcut
+        self.delay = config["delay"]
+
+    def auth(self):
+        self.bot.text_input("Tên tài khoản", self.config["username"])
+        self.bot.text_input("Mật khẩu", self.config["password"])
+        login_button_class = "btn btn-primary btn-login"
+        self.bot.click_after_clickable_xpath(f"//button[@class='{login_button_class}']")
+
+    def auto_select_test(self):
+        log.info("entering test page")
+        self.bot.click_contains("span", "Kiểm tra, đánh giá")
+        self.bot.click_contains("span", "Bài kiểm tra")
+        time.sleep(0.5)
+        all_tests = self.bot.driver.find_elements(
+            By.XPATH, "//div[@class='test-item mb-10 happening  exam-sucess']"
+        )
+
+        if len(all_tests) == 0:
+            log.info("no active test, exiting")
+            quit()
+
+        # if there are tests then list them all and the let the user select
+        log.info("selecting test")
+        for i, test in enumerate(all_tests):
+            text_name = test.find_element(By.TAG_NAME, "b").get_attribute("innerText")
+            print(f"{i+1}. {text_name}")
+
+        selected_test = int(input("Input the desired test to be done: ")) - 1
+        all_tests[selected_test].find_element(By.TAG_NAME, "a").click()
+        # becaues it's on mobile simulation, a confirmation button is shown
+        self.bot.click_contains("button", "Tiếp tục")
+        self.bot.click_contains("button", "Đồng ý")
+        time.sleep(1)
+
+    def handle_state(self):
+        while read_file("state") == "0":
+            print("state is off")
+            time.sleep(1)
+
+    def finish_normal_test(self):
+        for i, question in enumerate(self.all_questions):
+            self.handle_state()
+            log.info(f"checked on question {i+1}")
+            answers = question.find_elements(By.TAG_NAME, "div")
+            current_choice = answers[
+                self.question_suites[i].relative_correct_choice
+            ].find_element(By.TAG_NAME, "input")
+            self.bot.click_after_clickable(current_choice)
+            time.sleep(self.delay)
+
+    def finish_single_paged_test(self):
+        for i, question in enumerate(self.all_questions):
+            self.handle_state()
+            log.info(f"checked on question {i+1}")
+            choices = question.find_elements(By.TAG_NAME, "div")
+            current_choice = choices[
+                self.question_suites[i].relative_correct_choice
+            ].find_element(By.TAG_NAME, "input")
+            self.bot.click_after_clickable(current_choice)
+            time.sleep(self.delay)
+            if i != len(self.all_questions) - 1:
+                self.bot.click_after_clickable_xpath("//a[@title='Câu tiếp']")
+
+    def complete_test(self):
+        good_req_url = f"https://agg-thptnguyentrungtruc.k12online.vn/?module=Content.Form&moduleId=1&cmd=redraw&site="
+        log.info("attemping the exploit")
+        self.bot.driver.refresh()
+        time.sleep(3)
+
+        found_req = False
+        for i in range(0, self.config["max_attemp"]):
+            log.info(f"trying to get the `good request` exploit ({i} times)")
+            for req in self.bot.driver.requests:
+                if req.response and req.url.startswith(good_req_url):
+                    res_text = decode_gzip_bytes(req.response.body)
+                    found_req = True
+                    break
+            if found_req:
+                break
+            self.bot.driver.refresh()
+            time.sleep(3)
+
+        log.info("getting all questions")
+        self.all_questions = self.bot.driver.find_elements(
+            By.XPATH, "//div[@class='choice-info-val']"
+        )
+        log.info("getting correct answers")
+        self.question_suites: list[QuestionSuite] = parse(res_text)
+        log.info("ticking all the question")
+        if self.bot.check_exists_by_xpath("//a[@title='Câu tiếp']"):
+            self.finish_single_paged_test()
+        else:
+            self.finish_normal_test()
+        time.sleep(1000000)
+
+
+log.info("parsing cli arguments")
+parser = argparse.ArgumentParser()
+parser.add_argument("--username", type=str, help="custom username")
+parser.add_argument("--password", type=str, help="custom password")
+parser.add_argument("--delay", type=float, help="delay time")
+parser.add_argument("--manual", type=bool, help="toggle manual mode")
+args = parser.parse_args()
 
 log.info("parse config file")
 with open("config.yaml", "r") as stream:
-    user = yaml.safe_load(stream)
+    config = yaml.safe_load(stream)
+
+if args.username is not None:
+    config["username"] = args.username
+if args.password is not None:
+    config["password"] = args.password
+if args.delay is not None:
+    config["delay"] = args.delay
+if args.manual is not None:
+    config["manual"] = args.manual
 
 
-mobile_emulation = {
-    "deviceMetrics": {"width": 1366, "height": 786, "pixelRatio": 3.0},
-    "userAgent": "Mozilla/5.0 (Linux; Android 4.2.1; en-us; Nexus 5 Build/JOP40D) AppleWebKit/535.19 (KHTML, like Gecko) Chrome/18.0.1025.166 Mobile Safari/535.19",
-}
+if __name__ == "__main__":
+    k12_bot = K12Bot(config=config)
 
-# Setup
-log.info("set up webdriver")
-chrome_options = webdriver.ChromeOptions()
-chrome_options.add_extension("./extensions/always-active-ext.crx")
-chrome_options.add_experimental_option("mobileEmulation", mobile_emulation)
-# chrome_options.add_argument("--headless")
-chrome_options.add_argument("--disable-gpu")
-# chrome_options.add_argument("--window-size=1920x1080")
-# chrome_options.add_argument("--hide-scrollbars")
-
-driver = webdriver.Chrome(
-    options=chrome_options,
-    service=ChromeService(executable_path=ChromeDriverManager().install()),
-)
-action = ActionChains(driver)
-
-driver.get("https://agg-thptnguyentrungtruc.k12online.vn")
-
-
-def text_input(name, input):
-    driver.find_element("xpath", f"//input[@placeholder='{name}']").send_keys(input)
-
-
-def click_contains(type: str, text: str):
-    driver.find_element(By.XPATH, f"//{type}[contains(text(), '{text}')]").click()
-
-
-def login_button_click():
-    button_class = "btn btn-primary btn-login"
-    driver.find_element("xpath", f"//button[@class='{button_class}']").click()
-
-
-def gunzip_bytes_obj(bytes_obj: bytes) -> str:
-    return gzip.decompress(bytes_obj).decode()
-
-
-def chunks(lst, n):
-    """Yield successive n-sized chunks from lst."""
-    for i in range(0, len(lst), n):
-        yield lst[i : i + n]
-
-
-def file_content(path: str) -> str:
-    file = open(path, "r")
-    content = file.read()
-    file.close()
-    return content
-
-
-def normal_test():
-    click_contains("span", "Bài kiểm tra")
-    all_tests = driver.find_elements(
-        By.XPATH, "//div[@class='test-item mb-10 happening  exam-sucess']"
-    )
-
-    if len(all_tests) == 0:
-        log.info("no active test, exiting")
-        quit()
-
-    # if there is tests then list them all and the let the user select
-    log.info("selecting exam")
-    for i, test in enumerate(all_tests):
-        text_name = test.find_element(By.TAG_NAME, "b").get_attribute("innerText")
-        print(f"{i+1}. {text_name}")
-
-    selected_test = int(input("Input the desired test to be done: ")) - 1
-    all_tests[selected_test].find_element(By.TAG_NAME, "a").click()
-
-
-def special_test(type: str):
-    click_contains("span", "Kỳ thi")
-    time.sleep(1)
-    match type:
-        case "department":
-            type = "Cấp Sở/Phòng"
-        case "school":
-            type = "Cấp trường"
-
-    click_contains("a", type)
-    all_tests = driver.find_elements(By.XPATH, "//button[@id='accordion-button-1']")
-
-    if len(all_tests) == 0:
-        log.info("no active test, exiting")
-        quit()
-
-    # if there is tests then list them all and the let the user select
-    log.info("selecting exam")
-    for i, test in enumerate(all_tests):
-        test_name = test.find_element(By.CLASS_NAME, "title-exam").get_attribute(
-            "innerText"
-        )
-        print(f"{i+1}. {test_name}")
-
-    selected_test = int(input("Input the desired test to be done: ")) - 1
-    all_tests[selected_test].click()
-    time.sleep(1)
-    driver.find_element(By.XPATH, "//a[@class='btn btn-exam']").click()
-
-
-log.info("parsing config file")
-with open("config.yaml", "r") as stream:
-    user = yaml.safe_load(stream)
-
-# Auth
-text_input("Tên tài khoản", user["name"])
-text_input("Mật khẩu", user["password"])
-login_button_click()
-
-
-if user["manual"] == True:
-    input("Entering manual mode, press Enter to exit")
-else:
-    # getting into the exam page
-    log.info("getting into the exam page")
-    time.sleep(0.5)
-    click_contains("span", "Kiểm tra, đánh giá")
-    time.sleep(0.5)
-
-    print(user["test_type"])
-    if user["test_type"] == "normal":
-        normal_test()
+    if config["manual"] == False:
+        k12_bot.auth()
+        k12_bot.auto_select_test()
     else:
-        special_test(user["test_type"])
-    time.sleep(1)
-    # becaues it's on mobile simulation, a confirmation button is shown
-    time.sleep(0.5)
-    click_contains("button", "Tiếp tục")
-    time.sleep(0.5)
-    click_contains("button", "Đồng ý")
-    time.sleep(3)
-log.info("enter exam")
+        # Wait for signal to start
+        input()
 
-
-# refresh for the result exploit
-log.info("attemping the exploit")
-time.sleep(1)
-driver.refresh()
-time.sleep(3)
-
-# course_site_id = driver.current_url.partition("courseSiteId=")[2]
-course_site_id = "2004605"
-# request that contains the answer
-good_req_url = f"https://agg-thptnguyentrungtruc.k12online.vn/?module=Content.Form&moduleId=1&cmd=redraw&site={course_site_id}&url_mode=rewrite&submitFormId=1&moduleId=1&page=Courseware.Exam.doExam&site={course_site_id}"
-
-found_req = False
-for i in range(0, user["max_attemp"]):
-    log.info(f"trying to get the `good request` exploit ({i} times)")
-    for req in driver.requests:
-        if req.response and req.url == good_req_url:
-            res_text = gunzip_bytes_obj(req.response.body)
-            found_req = True
-            break
-    if found_req:
-        break
-    driver.refresh()
-    time.sleep(3)
-
-log.info("export the `good response` to a file")
-file = open("response-decoded.txt", "w+")
-file.write(res_text)
-file.close()
-
-total_question = len(
-    driver.find_element(By.CLASS_NAME, "checkExaming").find_elements(By.TAG_NAME, "a")
-)
-log.info("getting correct answers")
-correct_answers = parse(res_text, total_question, 4)
-print("finding all questions")
-all_questions = driver.find_elements("xpath", "//div[@class='choice-info-val']")
-print(len(all_questions))
-
-log.info("ticking all the question")
-for i, question in enumerate(all_questions):
-    while file_content("state") == "0\n":
-        time.sleep(1)
-    print(f"checked {i}")
-    log.info(f"checked on {i}")
-    answers = question.find_elements(By.TAG_NAME, "div")
-    print(len(answers))
-    answers[correct_answers[i]].find_element(By.TAG_NAME, "input").click()
-    time.sleep(0.5)
-
-
-log.info("finished")
-
-time.sleep(100000)
+    k12_bot.complete_test()
+    # while True:
+    #     try:
+    #         k12_bot.complete_test()
+    #     finally:
+    #         pass

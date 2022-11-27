@@ -9,14 +9,31 @@ from PIL import Image
 from pathlib import Path
 import logging as log
 import sys
+import os
 
-log.basicConfig(stream=sys.stdout, level=log.INFO)
+log.basicConfig(filename="logs.log", level=log.INFO)
+
+
+def write_file(path: str, content: str):
+    file = open(path, "w+")
+    file.write(content)
+    file.close()
+
+
+def read_file(path: str, not_exist_default="1") -> str:
+    if os.path.isfile(path):
+        file = open(path, "r")
+        content = file.read()
+        file.close()
+        return content
+    file = open(path, "w+")
+    file.write(not_exist_default)
+    file.close()
+    return not_exist_default
+
 
 log.info("set up webdriver")
 chrome_options = webdriver.ChromeOptions()
-chrome_options.add_argument("--headless")
-chrome_options.add_argument("--disable-gpu")
-chrome_options.add_argument("--window-size=1920x1080")
 chrome_options.add_argument("--hide-scrollbars")
 driver = webdriver.Chrome(
     options=chrome_options,
@@ -42,7 +59,9 @@ time.sleep(1)
 # handle tkb
 log.info("finding newest tkb")
 driver.find_element(By.ID, "select2-cbo_tkbhs-container").click()
-driver.find_element(By.CLASS_NAME, "select2-results__option").click()
+tkb_name = driver.find_element(By.CLASS_NAME, "select2-results__option")
+if tkb_name.get_attribute("innerText") == read_file("old.txt"):
+    print("still using old time table")
 time.sleep(1)
 
 # Styling before screenshot
@@ -54,13 +73,14 @@ document.getElementById("printTableHS").style.padding = "0px 0px 0px 0px";
 window.scrollBy(0, 200);
 """
 )
-time.sleep(1)
+time.sleep(2)
 
 # Screenshot and save tkb
 log.info("taking screenshot")
 tkb = driver.find_element(By.ID, "printTableHS").screenshot_as_png
 with open("tkb.png", "wb") as f:
     f.write(tkb)
+write_file("old.txt", tkb_name.get_attribute("innerText"))
 
 # stretch  image
 log.info("stretch image")

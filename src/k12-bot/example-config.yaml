@@ -1,6 +1,10 @@
 name: your user name
 password: your password
 
+# firefox or chrome
+# can capture fullpage screenshot with firefox
+browser: chrome
+
 # test types:
 # normal: normal (daily) tests
 # school: school level tests

@@ -4,3 +4,4 @@ screenshots/
 *.log
 state
 config.yaml
+response-decoded.txt
