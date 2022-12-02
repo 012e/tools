@@ -41,12 +41,12 @@ class BotDriver:
 
     def setup_firefox(self):
         profile = webdriver.FirefoxProfile()
-        profile.set_preference("general.useragent.override", self.mobile_emulation)
-        profile.add_extension(f"{self.cwd}/extensions/always-active-ext.xpi")
-        self.driver = webdriver.Firefox(
-            profile=profile,
-            executable_path=GeckoDriverManager().install(),
+        profile.set_preference(
+            "general.useragent.override",
+            "Mozilla/5.0 (iPhone; U; CPU iPhone OS 3_0 like Mac OS X; en-us) AppleWebKit/528.18 (KHTML, like Gecko) Version/4.0 Mobile/7A341 Safari/528.16",
         )
+        profile.add_extension(f"{self.cwd}/extensions/always-active-ext.xpi")
+        self.driver = webdriver.Firefox(profile, firefox_binary="/usr/bin/firefox")
 
     def fullpage_screenshot(self, path: str = "/tmp"):
         """
@@ -56,6 +56,12 @@ class BotDriver:
             self.driver.save_full_page_screenshot(path)  # type: ignore
         else:
             log.error("can not take fullpage screenshot with chrome")
+
+    def screenshot_and_save(self, element: WebElement, path: str):
+        screenshot = element.screenshot_as_png
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "wb+") as file:
+            file.write(screenshot)
 
     def text_input(self, name: str, input: str):
         log.info(f"inputting {input}, with name {name}")
@@ -91,7 +97,6 @@ class BotDriver:
 
     def click_after_clickable(self, element: WebElement):
         self.wait_until_clickable(element)
-        element.click()
 
     def click_after_clickable_xpath(self, xpath: str):
         self.wait_until_clickable_xpath(xpath).click()

@@ -1,6 +1,7 @@
 venv/
 __pycache__/
 screenshots/
+exams/
 *.log
 state
 config.yaml
